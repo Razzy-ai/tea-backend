@@ -1,10 +1,17 @@
 // require ('dotenv').config({path: './env'})
+
 import dotenv from "dotenv"
+dotenv.config({
+    path: './env'
+})
 
 // import mongoose from "mongoose";
 // import { DB_NAME } from "./constants.js";
 
 import connectDb from "./db/index.js";
+import {app} from "./app.js"
+
+
 
 // in connectDb async is there which means it gives some response of promise pending , etc so you need to handel them while calling by .then and .catch
 connectDb()
@@ -18,10 +25,6 @@ connectDb()
    console.log("Mongo db connection failed !!!" , err); 
 })
 
-
-dotenv.config({
-    path: './env'
-})
 
 
 
