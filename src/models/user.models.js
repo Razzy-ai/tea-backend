@@ -65,7 +65,7 @@ userSchema.pre("save" , async function(next){
     // if password field is not modified then move ahead
     if( !this.isModified("password")) return next();
 
-   this.password = bcrypt.hash(this.password , 10)
+   this.password = await bcrypt.hash(this.password , 10)
    next()
 })
 // after saving encrypted password in database. checking the user's password (user wants do to some changes he will again send some string ) is equal to encrypted password (from database)
@@ -73,7 +73,7 @@ userSchema.methods.isPasswordCorrect = async function(password){
    return await bcrypt.compare(password , this.password)
 }
 
-
+        
 userSchema.methods.generateAccessToken = function(){
    return jwt.sign(
         {
@@ -105,3 +105,5 @@ userSchema.methods.generateRefreshToken = function(){
 
 
 export const User = mongoose.model("User" , userSchema)
+
+// this user can directly contact to the database and can check user is already exist or not because this model is created through mongoose

@@ -19,6 +19,9 @@ import fs from "fs"
             })
             console.log("File is uploaded on cloudinary" , reponse.url);
             return response
+
+            // file ie. img and avatar after successfully uploaded on cloudinary it should be removed from server
+
         } catch (error) {
             // remove the locally saved temporary file as the upload operation get failed
             fs.unlinkSync(localFilePath)
