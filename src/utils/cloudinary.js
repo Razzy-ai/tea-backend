@@ -1,5 +1,4 @@
 import {v2 as cloudinary} from "cloudinary"
-import { response } from "express";
 import fs from "fs"
 
     // Configuration
@@ -14,17 +13,22 @@ import fs from "fs"
         try {
             if(!localFilePath) return null
             // upload the file on cloudinary
-           const reponse = await cloudinary.uploader.upload(localFilePath,{
+           const response = await cloudinary.uploader.upload(localFilePath,{
                 resource_type:"auto"
             })
-            console.log("File is uploaded on cloudinary" , reponse.url);
-            return response
+            console.log("File is uploaded on cloudinary" , response.url);
+           // File upload successful, remove the temporary file from the local server
+             fs.unlinkSync(localFilePath);
 
+           // Return the Cloudinary URL
+               return response;
             // file ie. img and avatar after successfully uploaded on cloudinary it should be removed from server
 
         } catch (error) {
             // remove the locally saved temporary file as the upload operation get failed
-            fs.unlinkSync(localFilePath)
+        
+                fs.unlinkSync(localFilePath);
+            console.error('Error uploading to Cloudinary:', error);
             return null
         }
     }

@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { registerUser } from "../controllers/user.controller.js";
+import { loginUser,logOutUser,refreshAccessToken,registerUser , refreshAccessToken } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 const router = Router()
 
@@ -22,5 +23,16 @@ router.route("/register").post(
     ]),
     registerUser
 )
+
+// post method used bcz we are taking information
+router.route("/login").post(loginUser)
+
+// secured routes
+router.route("/logout").post( verifyJWT,logOutUser)
+// verifyJWT ka next() will go on logOutUser 
+
+
+router.route("/refresh-token").post(refreshAccessToken)
+
 
 export default router
