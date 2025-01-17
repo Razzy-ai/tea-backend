@@ -302,6 +302,169 @@ const refreshAccessToken = asyncHandler ( async(res,req) => {
 
 
 
+// Basic activities when you want to create users
+const changeCurrentPassword = asyncHandler(async(req,res) => {
+// user se current password change karana h
+//  user is logged in or not and cookies are there are not will be checked by verifyjwt middleware
+
+ const {oldPassword , newPassword} = req.body
+
+//  const {oldPassword , newPassword , confpassword} = req.body
+//  if(!(newPassword != confpassword)){
+//     throw err
+//  }
 
 
-export {registerUser , loginUser , logOutUser , refreshAccessToken}
+//  i need to verify the password but at first i need user (tbhi to uske field mai jake password verify kr paunga) 
+//  if user password change kr pa rha means he was logged in  
+// logged in kaise hua middleware se and what middleware can do req.user(in auth.middleware)
+// so its confirm req.user mai user hai i can extract user id
+// then uss id se db mai check konsa user h
+
+// await used bcz findbyid is db method
+  const user = await User.findById(req.user?._id)
+// await used bcz ispasswordcorrect method is async method
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword)
+    
+   if(!isPasswordCorrect){
+    throw new ApiError(400 , "Invalid old password")
+   }
+
+// password set and  goes under bcrypt.hash 
+   user.password = newPassword
+//    after saving hook gets calles
+// need time bcz db hai
+      await user.save({validateBeforeSave:false})
+
+      return res
+      .status(200)
+      .json(new ApiResponse(200,{} , "Password change successfully"))
+
+
+})
+
+
+
+const getCurrentUser = asyncHandler( async(req,res) => {
+   return res
+   .status(200)
+//    req pe middleware run ho chuka h  . uss object mai user inject ho chuka h
+   .json(200,req.user, "current user fetched successfully")
+
+     
+})
+
+// if user wants to update other things like password 
+const updateAccountDetails = asyncHandler( async(req,res) => {
+ 
+     const {fullname,email} = req.body
+
+     if(!fullname || !email){
+        throw new ApiError(400 , "All fields are required")
+     }
+       
+    //  fullname , email update krkne k liye sending info
+    User.findByIdAndUpdate(
+
+        req.user?._id,
+        {
+           $set : {
+            fullname,
+            email:email
+           }
+        },
+        {new:true}
+    ).select("-password")
+
+    return res
+    .status(200)
+    .json(new ApiResponse(200 , user , "Accounts details updated successfully"))
+})
+
+
+// HOW TO UPDATE FILES
+// 1. middleware - multer will used to accept the new files
+// 2.middleware - dusra middleware we will use for the user who is logged in will only get access to change their files
+const updateUserAvatar = asyncHandler ( async(req,res) => {
+//    take only one file for update
+
+        const avatarLocalPath = req.file?.path
+        // avatar file is saved at local path and then directly we can save it on db without using cloudinary
+
+        if(!avatarLocalPath){
+            throw new ApiError(400 , "Avatar file is missing")
+        }
+ 
+         const avatar = await uploadOncloudinary(avatarLocalPath)
+        //  in avatar we got object from which we need url only
+
+         if(!avatar.url){
+            throw new ApiError(400 , "Error while uploading on avatar")
+         }
+
+        //  now updating avatar file
+       const user =  await User.findByIdAndUpdate(
+            // optionally unwrapping (when we use question mark ?)
+            req.user?._id,
+            { 
+               $set:{
+                avatar: avatar.url
+               }
+            },
+            {new:true}
+        ).select("-password")
+
+        return res
+        .status(200)
+        .json(new ApiResponse(200,user,"Avatar is uploaded successfully"))
+
+})
+ 
+const updateUserCoverImage = asyncHandler ( async(req,res) => {
+    //    take only one file for update
+    
+            const coverImageLocalPath = req.file?.path
+            // avatar file is saved at local path and then directly we can save it on db without using cloudinary
+    
+            if(!coverImageLocalPath){
+                throw new ApiError(400 , "Cover img file is missing")
+            }
+     
+             const coverImage = await uploadOncloudinary(coverImageLocalPath)
+            //  in avatar we got object from which we need url only
+    
+             if(!coverImage.url){
+                throw new ApiError(400 , "Error while uploading on cover img")
+             }
+    
+            //  now updating avatar file
+            const user =   await User.findByIdAndUpdate(
+                // optionally unwrapping (when we use question mark ?)
+                req.user?._id,
+                { 
+                   $set:{
+                    coverImage: coverImage.url
+                   }
+                },
+                {new:true}
+            ).select("-password")
+
+        return res
+        .status(200)
+        .json(new ApiResponse(200,user,"CoverImage is uploaded successfully"))
+
+    
+    })
+
+
+export {registerUser ,
+        loginUser ,
+       logOutUser ,
+       refreshAccessToken ,
+       changeCurrentPassword,
+        getCurrentUser , 
+        updateAccountDetails,
+       updateUserAvatar,
+       updateUserCoverImage
+
+}
