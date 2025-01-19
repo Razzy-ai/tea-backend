@@ -5,6 +5,7 @@ import { User } from "../models/user.models.js";
 import {uploadOncloudinary} from "../utils/cloudinary.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import  jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 
 // generating access and refresh token is common therefore created a function
@@ -338,7 +339,7 @@ const changeCurrentPassword = asyncHandler(async(req,res) => {
 
       return res
       .status(200)
-      .json(new ApiResponse(200,{} , "Password change successfully"))
+      .json(new ApiResponse(200,{} , "Password changed successfully"))
 
 
 })
@@ -349,7 +350,7 @@ const getCurrentUser = asyncHandler( async(req,res) => {
    return res
    .status(200)
 //    req pe middleware run ho chuka h  . uss object mai user inject ho chuka h
-   .json(200,req.user, "current user fetched successfully")
+   .json( new ApiResponse (200,req.user, "current user fetched successfully"))
 
      
 })
@@ -364,7 +365,7 @@ const updateAccountDetails = asyncHandler( async(req,res) => {
      }
        
     //  fullname , email update krkne k liye sending info
-    User.findByIdAndUpdate(
+    const user = await User.findByIdAndUpdate(
 
         req.user?._id,
         {
@@ -394,6 +395,8 @@ const updateUserAvatar = asyncHandler ( async(req,res) => {
         if(!avatarLocalPath){
             throw new ApiError(400 , "Avatar file is missing")
         }
+
+        // todo :delete the old image
  
          const avatar = await uploadOncloudinary(avatarLocalPath)
         //  in avatar we got object from which we need url only
@@ -457,6 +460,165 @@ const updateUserCoverImage = asyncHandler ( async(req,res) => {
     })
 
 
+//  aggregation pipelines
+  const  getUserChannelProfile = asyncHandler (async(req,res) => {
+       
+    // req.param means url se channel ka username finding
+    const {username} = req.params
+ 
+    if(!username?.trim()){
+        throw new ApiError(400,"username is missing")
+    }
+
+    // applying aggregate pipelines 
+    // after applying you will get arrays in return 
+     const channel = await User.aggregate([
+
+        {
+            $match: {
+                username : username?.toLowerCase()
+            }
+        },
+        {
+            $lookup: {
+                // taken from here mongoose.model("Subscriptions" , subscriptionSchema) in lower case
+                from:"subscriptions",
+                localField: "_id",
+                // channel ko select kiya subscriber milenge
+                foreignField: "channel",
+                as:"subscribers"
+                // this is the first pipeline where we found the subscribers
+            }
+        },
+        {
+            $lookup: {
+                // taken from here mongoose.model("Subscriptions" , subscriptionSchema) in lower case
+                from:"subscriptions",
+                localField: "_id",
+                // subscriber ko select kiya channel milenge
+                foreignField: "subscriber",
+                as:"subscribedTo"
+                // this is the first pipeline where we found the subscribers
+            }
+        },
+        {
+            // add additional fields too
+            $addFields : {
+                        subscriberCount:{
+                            // count the documents by using $size
+                            $size: "$subscribers"
+                        },
+                        channelSubscribedToCount:{
+
+                            $size: "$subscribedTo"
+                        },
+
+                        // now frontend ko true or false message send so that he will know user subscribed or not acc. to that changes will be  apply on the button
+                        isSubscribed: {
+                            $cond:{
+                                if: {$in: [req.user?._id , "$subscribers.subscriber"]},
+                                then:true,
+                                else:false
+                            }
+                        }
+            }
+        },
+         
+           {
+            // take only selected values only
+              $project: {
+                fullname: 1,
+                username:1,
+                subscriberCount: 1,
+                channelSubscribedToCount: 1,
+                isSubscribed:1,
+                avatar:1,
+                coverImage:1,
+                email:1
+              }
+              
+           }
+     ])
+
+  
+    if(!channel?.length){
+        throw new ApiError(404 , "Channel does not exist")
+    }
+   
+    // else if channel ki length hui toh usme arr ki first val ie. id vhi return kardo
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200 , channel[0] , "User channel fetched successfully")
+    )
+  })
+
+
+
+  const getWatchHistory = asyncHandler (async(req,res)  => {
+        
+    const user = await User.aggregate([
+
+         {
+            $match : {
+                _id : new mongoose.Types.ObjectId(req.user._id)
+                // now user ki id mili abb uss field mai watchhistory ko look krna h use lookup
+            }
+         },
+         {
+             $lookup : {
+                from:"videos",
+                localField:"watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField:"_id",
+                            as:"owner",
+                            pipeline: [
+                                {
+                                    $project:{
+                                        fullname:1,
+                                        username: 1,
+                                        avatar: 1
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        // in output we get arrays therefore we need only first value of the owner object
+                        $addFields: {
+                            owner: {
+                                $first: "$owner"
+                            }
+                        }
+                    }
+                ]
+
+             }
+         }
+    ])
+    
+     return res
+     .status(200)
+     .json (
+        new ApiResponse(
+            200 , 
+            user[0].watchHistory , 
+            "Watch history fetched successfully"
+        )
+     )
+
+
+  })
+
+
+
 export {registerUser ,
         loginUser ,
        logOutUser ,
@@ -465,6 +627,8 @@ export {registerUser ,
         getCurrentUser , 
         updateAccountDetails,
        updateUserAvatar,
-       updateUserCoverImage
+       updateUserCoverImage,
+       getUserChannelProfile,
+       getWatchHistory
 
 }
